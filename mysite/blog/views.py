@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.shortcuts import render, get_object_or_404
 from .models import Post
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -28,7 +29,13 @@ def post_detail(request, year, month, day, post):
     post = get_object_or_404(Post, status=Post.Status.PUBLISHED, slug=post, publish__year=year, publish__month=month, publish__day=day)
     comments = post.comments.filter(active=True)
     form=CommentForm()
-    return render(request, 'blog/post/detail.html', {'post': post, 'comments': comments, 'form': form})
+
+    # list of similar posts
+    post_tags_ids=post.tags.values_list('id', flat=True)
+    similar_posts = Post.published.filter(tags__in=post_tags_ids).exclude(id=post.id)
+    similar_posts=similar_posts.annotate(same_tags=Count('tags')).order_by('-same_tags','-publish')[:4]
+
+    return render(request, 'blog/post/detail.html', {'post': post, 'comments': comments, 'form': form, 'similar_posts': similar_posts})
 
 def post_share(request, post_id):
     #Retrieve post by id
